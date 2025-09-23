@@ -1,0 +1,14 @@
+[package]
+name = "challengeresult"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { version = "0.4.42", features = ["unstable-locales"] }
+fern = "0.7.1"
+log = "0.4.28"
+reqwest = { version = "0.12.23", features = ["json"] }
+rocket = { version = "0.5.1", features = ["json", "uuid"] }
+serde = { version = "1.0.219", features = ["alloc", "derive"] }
+serde_json = { version = "1.0.143", features = ["alloc"] }
+tokio = { version = "1.47.1", features = ["full"] }

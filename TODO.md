@@ -1,0 +1,10 @@
+- [ ] Configurar algum linter pra Rust
+- [ ] Escrever testes
+- [ ] Reescrever os users em `Arc<RwLock>`
+- [ ] Quebrar o projeto em módulos (ou namespace, ou classes, whatever)
+- [ ] Tentar alguma forma de não usar TempFile para receber os usuários via multipart
+- [ ] No get_superusers, tentar usar `into_iter()` ou invés de `iter()`
+- [ ] Refatorar classe Evaluation
+- [ ] Criar função `math_round(n, DECIMAL_DIGITS)` e refatorar o método `update_with_user()`.
+- [ ] Ver se dá pra melhorar o `acc.insert(u.team.name.clone(), insight.clone());`
+- [ ] Se eu tiver afim, melhorar `ActiveUserLogin { date, total }`
