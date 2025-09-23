@@ -1,4 +1,4 @@
-- [ ] Configurar algum linter pra Rust
+- [x] Configurar algum linter pra Rust
 - [ ] Escrever testes
 - [ ] Reescrever os users em `Arc<RwLock>`
 - [ ] Quebrar o projeto em módulos (ou namespace, ou classes, whatever)

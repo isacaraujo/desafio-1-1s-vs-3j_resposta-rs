@@ -25,6 +25,71 @@ Para melhorar o desenvolvimento estou utilizando os seguintes plugins:
 - [rust | vscode](https://marketplace.visualstudio.com/items?itemName=1YiB.rust-bundle): Sou novo no Rust, então preciso de um help no desenvolvimento.
 - [awesome rust](https://github.com/rust-unofficial/awesome-rust): O primeiro awesome rust que encontrei. So far so good.
 
+## Começando o projeto
+
+Clone o projeto:
+
+```sh
+$ git clone git@github.com:isacaraujo/desafio-1-1s-vs-3j_resposta-rs.git
+$ cd desafio-1-1s-vs-3j_resposta-rs
+```
+
+Faça um build do projeto - não há um `npm install` ou equivalente :/
+
+```
+$ cargo build
+```
+
+### Linter e Beautification
+
+Todas as ferramentas abaixo são built-in do Rust <3.
+
+#### Rust Check
+
+Use o _rust check_ para verificar warnings e afins:
+
+```sh
+$ cargo check
+ ```
+
+#### Clippy
+
+Use o `clippy` para fazer a análise estática do código (excelente ferramenta):
+
+```sh
+$ cargo clippy
+```
+
+E para corrigir:
+
+```sh
+$ cargo clippy --fix --bin "challengeresult"
+```
+
+#### Formatter
+
+Para formatar de deixar o código em conformidade:
+
+```sh
+$ cargo fmt
+```
+
+### Build
+
+O rust é uma linguagem compilada, logo, ele entrga um binário no final do projeto. Para o ambiente de desenvolvimento, podemos gerar um código não otimizado, que prioriza o a velocidade de compilação:
+
+```
+$ cargo build
+```
+
+Já para rodar em produção, utilizamos a o pofile `release`:
+
+```
+$ cargo build --release
+```
+
+Para saber mais: https://doc.rust-lang.org/book/ch14-01-release-profiles.html
+
 ## Por que Rust?
 
 Trabalho com desenvolvimento desde 2010 - façam as contas. Desde esta época já entreguei projetos em PHP (mais do que gostaria - a linguagem me persegue), java, node (js e ts), golang, ruby, python, alguns frontends também, Java, Kotlin (Android) e Objective-C/C/C++ (iOS) e também IoT (c).
