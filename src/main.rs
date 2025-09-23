@@ -43,7 +43,7 @@ struct User {
     logs: Vec<UserLog>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq, Debug)]
 #[serde(crate = "rocket::serde")]
 struct CreateUsersResp {
     message: String,
@@ -620,4 +620,40 @@ fn rocket() -> _ {
             get_evaluation,
         ],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use rocket::Either;
+    use std::path::Path;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_post_users() {
+        let rocket = rocket::build().manage(Root::new());
+        let root: &State<Root> = State::get(&rocket).unwrap();
+        let sample_path = Path::new("./samples/usuarios_1000.json");
+
+        let temp_file = TempFile::File {
+            file_name: None,
+            content_type: None,
+            path: Either::Right(sample_path.to_path_buf()),
+            len: 0,
+        };
+
+        let upload = Form::from(Upload { file: temp_file });
+
+        let resp = post_users(upload, root).await.unwrap();
+
+        assert_eq!(
+            resp.0,
+            CreateUsersResp {
+                message: String::from("Arquivo recebido com sucesso"),
+                user_count: 1_000,
+            }
+        );
+
+        assert_eq!(root.get_users().len(), 1_000);
+    }
 }
