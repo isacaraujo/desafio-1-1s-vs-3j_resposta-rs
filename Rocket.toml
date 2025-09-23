@@ -1,3 +1,3 @@
 [default]
 address = "0.0.0.0"
-limits = { data-form = "128 MiB", file = "128 MiB" }
+limits = { data-form = "128 MiB", string = "128 MiB" }

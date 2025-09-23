@@ -4,9 +4,7 @@ extern crate rocket;
 use chrono::Local;
 use rocket::State;
 use rocket::form::Form;
-use rocket::fs::TempFile;
 use rocket::serde::json::Json;
-use rocket::tokio::io::AsyncReadExt;
 use rocket::tokio::time::Instant;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -141,13 +139,13 @@ fn index() -> &'static str {
 }
 
 #[derive(FromForm, Debug)]
-struct Upload<'r> {
-    file: TempFile<'r>,
+struct Upload {
+    file: String,
 }
 
 #[post("/users", data = "<upload>")]
 async fn post_users(
-    upload: Form<Upload<'_>>,
+    upload: Form<Upload>,
     root: &State<Root>,
 ) -> std::io::Result<Json<CreateUsersResp>> {
     /* FOI MUITO DIFÍCIL FAZER ESTE MÉTODO!
@@ -166,13 +164,7 @@ async fn post_users(
      * Bom, o resultado do código são as gambiarras abaixo (acredite,
      * sem ajuda de LLM hahaha - talvez por isso não ficou tão bom).
      */
-    let mut stream = upload.file.open().await?;
-
-    let mut buffer = String::new();
-
-    let _ = stream.read_to_string(&mut buffer).await?;
-
-    let users: Vec<User> = serde_json::from_str(&buffer)?;
+    let users: Vec<User> = serde_json::from_str(&upload.file)?;
 
     let users_len = users.len();
 
@@ -624,8 +616,7 @@ fn rocket() -> _ {
 
 #[cfg(test)]
 mod tests {
-    use rocket::Either;
-    use std::path::Path;
+    use std::{fs::File, io::Read, path::Path};
 
     use super::*;
 
@@ -635,14 +626,14 @@ mod tests {
         let root: &State<Root> = State::get(&rocket).unwrap();
         let sample_path = Path::new("./samples/usuarios_10.json");
 
-        let temp_file = TempFile::File {
-            file_name: None,
-            content_type: None,
-            path: Either::Right(sample_path.to_path_buf()),
-            len: 0,
-        };
+        let mut buf = String::new();
 
-        let upload = Form::from(Upload { file: temp_file });
+        File::open(sample_path)
+            .unwrap()
+            .read_to_string(&mut buf)
+            .unwrap();
+
+        let upload = Form::from(Upload { file: buf });
 
         let resp = post_users(upload, root).await.unwrap();
 
