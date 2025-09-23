@@ -1,13 +1,14 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
 use chrono::Local;
+use rocket::State;
+use rocket::form::Form;
 use rocket::fs::TempFile;
+use rocket::serde::json::Json;
 use rocket::tokio::io::AsyncReadExt;
 use rocket::tokio::time::Instant;
-use rocket::State;
 use serde::{Deserialize, Serialize};
-use rocket::serde::json::Json;
-use rocket::form::Form;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
@@ -22,7 +23,6 @@ struct UserTeam {
     name: String,
     leader: bool,
     projects: Vec<TeamProject>,
-
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -33,14 +33,14 @@ struct UserLog {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct User {
-  id: String,
-  name: String,
-  age: u8,
-  score: u16,
-  active: bool,
-  country: String,
-  team: UserTeam,
-  logs: Vec<UserLog>,
+    id: String,
+    name: String,
+    age: u8,
+    score: u16,
+    active: bool,
+    country: String,
+    team: UserTeam,
+    logs: Vec<UserLog>,
 }
 
 #[derive(Serialize)]
@@ -80,7 +80,9 @@ impl Root {
          */
         let users = Box::new(Vec::new());
 
-        Root { users: AtomicPtr::new(Box::into_raw(users)) }
+        Root {
+            users: AtomicPtr::new(Box::into_raw(users)),
+        }
     }
 
     fn update(&self, new_users: Vec<User>) {
@@ -118,9 +120,7 @@ impl Root {
             return Vec::new();
         }
 
-        unsafe {
-            (*ptr).clone()
-        }
+        unsafe { (*ptr).clone() }
     }
 }
 
@@ -146,7 +146,10 @@ struct Upload<'r> {
 }
 
 #[post("/users", data = "<upload>")]
-async fn post_users<'a>(upload: Form<Upload<'_>>, root: &State<Root>) -> std::io::Result<Json<CreateUsersResp>> {
+async fn post_users<'a>(
+    upload: Form<Upload<'_>>,
+    root: &State<Root>,
+) -> std::io::Result<Json<CreateUsersResp>> {
     /* FOI MUITO DIFÍCIL FAZER ESTE MÉTODO!
      * Tem algumas formas de processar um multipart request:
      * - Podemos processar o request Raw - aí precisaríamos
@@ -226,7 +229,8 @@ async fn get_superusers(root: &State<Root>) -> std::io::Result<Json<GetSuperuser
      * então chamar o `collect()`.
      * Ah, o serde ainda não serializa Iterators (infelizmente).
      * */
-    let superusers: Vec<User> = users.iter()
+    let superusers: Vec<User> = users
+        .iter()
         .filter(|u| u.score >= 900 && u.active)
         .cloned()
         .collect();
@@ -235,7 +239,7 @@ async fn get_superusers(root: &State<Root>) -> std::io::Result<Json<GetSuperuser
 
     /* NOTA DO EDITOR:
      * `start_time.elapsed()` <3 - achei fofo hahaha
-    */
+     */
     let elapsed_time = start_time.elapsed();
 
     Ok(Json(GetSuperusersResp {
@@ -272,20 +276,23 @@ async fn get_topcountries(root: &State<Root>) -> std::io::Result<Json<TopCountri
      * Achei bem bom. Neste ponto eu já estava um pouco mais
      * familiarizado com o esquema de ownership, então resolver
      * aqui foi mais google e conhecimendo adquirido.
-    */
-    let summary: HashMap<String, usize> = users.iter()
-        .fold(HashMap::new(), |mut acc, u| {
-            let def = 0;
-            let val = acc.get(&u.country).unwrap_or(&def);
-            acc.insert(u.country.clone(), val + 1);
-            acc
-        });
+     */
+    let summary: HashMap<String, usize> = users.iter().fold(HashMap::new(), |mut acc, u| {
+        let def = 0;
+        let val = acc.get(&u.country).unwrap_or(&def);
+        acc.insert(u.country.clone(), val + 1);
+        acc
+    });
 
     let mut sorted: Vec<(String, usize)> = summary.into_iter().collect();
     sorted.sort_by(|(_, av), (_, bv)| bv.cmp(&av));
 
-    let countries: Vec<CountrySummary> = sorted[0..5].into_iter()
-        .map(|(c, t)| CountrySummary { country: c.clone(), total: t.clone() })
+    let countries: Vec<CountrySummary> = sorted[0..5]
+        .into_iter()
+        .map(|(c, t)| CountrySummary {
+            country: c.clone(),
+            total: t.clone(),
+        })
         .collect();
 
     Ok(Json(TopCountriesResp {
@@ -337,7 +344,7 @@ impl TeamInsight {
         /* Este código aqui abaixo tá feio bagarai....
          * Mais um TODO pra dar uma refatoradazin dele,
          * né!? Um `math_round()` ou algo assim */
-        let scale_factor= 10.0;
+        let scale_factor = 10.0;
         let active_pct = self.active_count as f32 / self.total_members as f32 * 100.0;
 
         self.active_percentage = (active_pct * scale_factor).trunc() / scale_factor;
@@ -370,29 +377,23 @@ async fn get_team_insights(root: &State<Root>) -> std::io::Result<Json<TeamInsig
 
     let users = root.get_users();
 
-    let summary: HashMap<String, TeamInsight> = users.iter()
-        .fold(HashMap::new(), |mut acc, u| {
-            let def = TeamInsight::new();
-            let mut insight = acc.get(&u.team.name)
-                .unwrap_or(&def)
-                .to_owned();
+    let summary: HashMap<String, TeamInsight> = users.iter().fold(HashMap::new(), |mut acc, u| {
+        let def = TeamInsight::new();
+        let mut insight = acc.get(&u.team.name).unwrap_or(&def).to_owned();
 
-            insight.update_with_user(u);
+        insight.update_with_user(u);
 
-            /* Olha, eu não sei se fazer isso é a melhor opção -
-             * inserir algo já inserido.
-             * Vou perder a vergonha e perguntar pro clause
-             * se há uma forma melhor de melhorar este insert
-             */
-            acc.insert(u.team.name.clone(), insight.clone());
+        /* Olha, eu não sei se fazer isso é a melhor opção -
+         * inserir algo já inserido.
+         * Vou perder a vergonha e perguntar pro clause
+         * se há uma forma melhor de melhorar este insert
+         */
+        acc.insert(u.team.name.clone(), insight.clone());
 
-            acc
-        });
+        acc
+    });
 
-    let teams: Vec<TeamInsight> = summary.iter()
-        .map(|(_, v)| v)
-        .cloned()
-        .collect();
+    let teams: Vec<TeamInsight> = summary.iter().map(|(_, v)| v).cloned().collect();
 
     Ok(Json(TeamInsightsResp {
         timestamp: format!("{:?}", Local::now()),
@@ -415,26 +416,28 @@ struct ActiveUsersResp {
 }
 
 #[get("/active-users-per-day?<min>")]
-async fn get_active_users_per_day(min: Option<u16>, root: &State<Root>) -> std::io::Result<Json<ActiveUsersResp>> {
+async fn get_active_users_per_day(
+    min: Option<u16>,
+    root: &State<Root>,
+) -> std::io::Result<Json<ActiveUsersResp>> {
     // Conta quantos logins aconteceram por data.
     // Query param opcional: ?min=3000 para filtrar dias com pelo menos 3.000 logins.
     let start_time = Instant::now();
 
     let users = root.get_users();
 
-    let summary: HashMap<String, usize> = users.iter()
-        .fold(HashMap::new(), |mut acc, u| {
-            for l in u.logs.iter() {
-                let def = 0;
-                let login_count = acc.get(&l.date).unwrap_or(&def);
+    let summary: HashMap<String, usize> = users.iter().fold(HashMap::new(), |mut acc, u| {
+        for l in u.logs.iter() {
+            let def = 0;
+            let login_count = acc.get(&l.date).unwrap_or(&def);
 
-                /* Mais uma gambiarra do insert. Vou ver
-                 * se há como melhorar!
-                 */
-                acc.insert(l.date.clone(), login_count + 1);
-            }
-            acc
-        });
+            /* Mais uma gambiarra do insert. Vou ver
+             * se há como melhorar!
+             */
+            acc.insert(l.date.clone(), login_count + 1);
+        }
+        acc
+    });
 
     let min_ = min.unwrap_or(0) as usize;
 
@@ -442,7 +445,8 @@ async fn get_active_users_per_day(min: Option<u16>, root: &State<Root>) -> std::
      * Acho que é preciosismo (vou deixar no TODO com nota
      * de frescura check)
      */
-    let logins: Vec<ActiveUserLogin> = summary.into_iter()
+    let logins: Vec<ActiveUserLogin> = summary
+        .into_iter()
         .filter(|(_, v)| v >= &min_)
         .map(|(date, total)| ActiveUserLogin { date, total })
         .collect();
@@ -475,66 +479,94 @@ const BASE_URL: &'static str = "http://localhost:8000";
  * achei prático fazer o copy/paste. Mas tá olhar essa grosseria aqui
  */
 impl Evaluation {
-    async fn evaluate_superusers(mut endpoints: HashMap<String, RouteMetric>) -> std::io::Result<HashMap<String, RouteMetric>> {
-        let resp = reqwest::get(format!("{}/superusers", BASE_URL)).await.unwrap();
+    async fn evaluate_superusers(
+        mut endpoints: HashMap<String, RouteMetric>,
+    ) -> std::io::Result<HashMap<String, RouteMetric>> {
+        let resp = reqwest::get(format!("{}/superusers", BASE_URL))
+            .await
+            .unwrap();
 
         let status = resp.status();
 
         let body = resp.json::<GetSuperusersResp>().await.unwrap();
 
-        endpoints.insert(String::from("/superusers"), RouteMetric {
-            status: status.as_u16(),
-            time_ms: body.execution_time_ms,
-            valid_response: true,
-        });
+        endpoints.insert(
+            String::from("/superusers"),
+            RouteMetric {
+                status: status.as_u16(),
+                time_ms: body.execution_time_ms,
+                valid_response: true,
+            },
+        );
 
         Ok(endpoints)
     }
 
-    async fn evaluate_topcountries(mut endpoints: HashMap<String, RouteMetric>) -> std::io::Result<HashMap<String, RouteMetric>> {
-        let resp = reqwest::get(format!("{}/top-countries", BASE_URL)).await.unwrap();
+    async fn evaluate_topcountries(
+        mut endpoints: HashMap<String, RouteMetric>,
+    ) -> std::io::Result<HashMap<String, RouteMetric>> {
+        let resp = reqwest::get(format!("{}/top-countries", BASE_URL))
+            .await
+            .unwrap();
 
         let status = resp.status();
 
         let body = resp.json::<TopCountriesResp>().await.unwrap();
 
-        endpoints.insert(String::from("/top-countries"), RouteMetric {
-            status: status.as_u16(),
-            time_ms: body.execution_time_ms,
-            valid_response: true,
-        });
+        endpoints.insert(
+            String::from("/top-countries"),
+            RouteMetric {
+                status: status.as_u16(),
+                time_ms: body.execution_time_ms,
+                valid_response: true,
+            },
+        );
 
         Ok(endpoints)
     }
 
-    async fn evaluate_team_insights(mut endpoints: HashMap<String, RouteMetric>) -> std::io::Result<HashMap<String, RouteMetric>> {
-        let resp = reqwest::get(format!("{}/team-insights", BASE_URL)).await.unwrap();
+    async fn evaluate_team_insights(
+        mut endpoints: HashMap<String, RouteMetric>,
+    ) -> std::io::Result<HashMap<String, RouteMetric>> {
+        let resp = reqwest::get(format!("{}/team-insights", BASE_URL))
+            .await
+            .unwrap();
 
         let status = resp.status();
 
         let body = resp.json::<TeamInsightsResp>().await.unwrap();
 
-        endpoints.insert(String::from("/team-insights"), RouteMetric {
-            status: status.as_u16(),
-            time_ms: body.execution_time_ms,
-            valid_response: true,
-        });
+        endpoints.insert(
+            String::from("/team-insights"),
+            RouteMetric {
+                status: status.as_u16(),
+                time_ms: body.execution_time_ms,
+                valid_response: true,
+            },
+        );
 
         Ok(endpoints)
     }
 
-    async fn evaluate_active_users_per_day(mut endpoints: HashMap<String, RouteMetric>) -> std::io::Result<HashMap<String, RouteMetric>> {
-        let resp = reqwest::get(format!("{}/active-users-per-day", BASE_URL)).await.unwrap();
+    async fn evaluate_active_users_per_day(
+        mut endpoints: HashMap<String, RouteMetric>,
+    ) -> std::io::Result<HashMap<String, RouteMetric>> {
+        let resp = reqwest::get(format!("{}/active-users-per-day", BASE_URL))
+            .await
+            .unwrap();
 
         let status = resp.status();
 
         let body = resp.json::<ActiveUsersResp>().await.unwrap();
 
-        endpoints.insert(String::from("/active-users-per-day"), RouteMetric {
-            status: status.as_u16(),
-            time_ms: body.execution_time_ms,
-            valid_response: true,
-        });
+        endpoints.insert(
+            String::from("/active-users-per-day"),
+            RouteMetric {
+                status: status.as_u16(),
+                time_ms: body.execution_time_ms,
+                valid_response: true,
+            },
+        );
 
         Ok(endpoints)
     }
@@ -557,22 +589,28 @@ async fn get_evaluation() -> std::io::Result<Json<EvaluationResp>> {
     let mut tested_endpoints = HashMap::new();
 
     /* Início do show de horrores */
-    tested_endpoints = Evaluation::evaluate_superusers(tested_endpoints).await.unwrap();
-    tested_endpoints = Evaluation::evaluate_topcountries(tested_endpoints).await.unwrap();
-    tested_endpoints = Evaluation::evaluate_team_insights(tested_endpoints).await.unwrap();
-    tested_endpoints = Evaluation::evaluate_active_users_per_day(tested_endpoints).await.unwrap();
+    tested_endpoints = Evaluation::evaluate_superusers(tested_endpoints)
+        .await
+        .unwrap();
+    tested_endpoints = Evaluation::evaluate_topcountries(tested_endpoints)
+        .await
+        .unwrap();
+    tested_endpoints = Evaluation::evaluate_team_insights(tested_endpoints)
+        .await
+        .unwrap();
+    tested_endpoints = Evaluation::evaluate_active_users_per_day(tested_endpoints)
+        .await
+        .unwrap();
     /* Fim do show de horrores */
 
-    Ok(Json(EvaluationResp {
-        tested_endpoints,
-    }))
+    Ok(Json(EvaluationResp { tested_endpoints }))
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build()
-        .manage(Root::new())
-        .mount("/", routes![
+    rocket::build().manage(Root::new()).mount(
+        "/",
+        routes![
             index,
             post_users,
             get_superusers,
@@ -580,5 +618,6 @@ fn rocket() -> _ {
             get_team_insights,
             get_active_users_per_day,
             get_evaluation,
-        ])
+        ],
+    )
 }
