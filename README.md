@@ -2,7 +2,7 @@
 
 https://github.com/codecon-dev/desafio-1-1s-vs-3j
 
-> Este README utiliza português vulgar de São Paulo. Por favor, não se prenda aos vícios de linguagem. O importante é o racional por traz do projeto.
+> Este README utiliza português vulgar de São Paulo. Por favor, não se prenda aos vícios de linguagem. O importante é o racional por trás do projeto.
 
 ## Introdução
 
