@@ -146,7 +146,7 @@ struct Upload<'r> {
 }
 
 #[post("/users", data = "<upload>")]
-async fn post_users<'a>(
+async fn post_users(
     upload: Form<Upload<'_>>,
     root: &State<Root>,
 ) -> std::io::Result<Json<CreateUsersResp>> {
@@ -172,7 +172,7 @@ async fn post_users<'a>(
 
     let _ = stream.read_to_string(&mut buffer).await?;
 
-    let users: Vec<User> = serde_json::from_str(&mut buffer)?;
+    let users: Vec<User> = serde_json::from_str(&buffer)?;
 
     let users_len = users.len();
 
@@ -285,13 +285,13 @@ async fn get_topcountries(root: &State<Root>) -> std::io::Result<Json<TopCountri
     });
 
     let mut sorted: Vec<(String, usize)> = summary.into_iter().collect();
-    sorted.sort_by(|(_, av), (_, bv)| bv.cmp(&av));
+    sorted.sort_by(|(_, av), (_, bv)| bv.cmp(av));
 
     let countries: Vec<CountrySummary> = sorted[0..5]
-        .into_iter()
+        .iter()
         .map(|(c, t)| CountrySummary {
             country: c.clone(),
-            total: t.clone(),
+            total: *t,
         })
         .collect();
 
@@ -335,10 +335,10 @@ impl TeamInsight {
      * tá!?
      */
     fn update_with_user(&mut self, u: &User) {
-        self.total_members = self.total_members + 1;
+        self.total_members += 1;
 
         if u.active {
-            self.active_count = self.active_count + 1;
+            self.active_count += 1;
         }
 
         /* Este código aqui abaixo tá feio bagarai....
@@ -350,12 +350,12 @@ impl TeamInsight {
         self.active_percentage = (active_pct * scale_factor).trunc() / scale_factor;
 
         if u.team.leader {
-            self.leaders = self.leaders + 1;
+            self.leaders += 1;
         }
 
         for p in u.team.projects.iter() {
             if p.completed {
-                self.completed_projects = self.completed_projects + 1;
+                self.completed_projects += 1;
             }
         }
     }
@@ -393,7 +393,7 @@ async fn get_team_insights(root: &State<Root>) -> std::io::Result<Json<TeamInsig
         acc
     });
 
-    let teams: Vec<TeamInsight> = summary.iter().map(|(_, v)| v).cloned().collect();
+    let teams: Vec<TeamInsight> = summary.values().cloned().collect();
 
     Ok(Json(TeamInsightsResp {
         timestamp: format!("{:?}", Local::now()),
@@ -472,7 +472,7 @@ struct EvaluationResp {
 
 struct Evaluation;
 
-const BASE_URL: &'static str = "http://localhost:8000";
+const BASE_URL: &str = "http://localhost:8000";
 
 /* Esta classe Evaluation definitivamente precisa ser refatorada!
  * Na pressa eu criei uma função evaluate pra cada endpoint. Na velocidade
