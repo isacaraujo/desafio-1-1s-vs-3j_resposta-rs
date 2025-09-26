@@ -250,7 +250,7 @@ fn get_superusers(root: &State<Root>) -> Json<GetSuperusersResp> {
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct CountrySummary {
     country: String,
     total: usize,
@@ -264,7 +264,7 @@ struct TopCountriesResp {
 }
 
 #[get("/top-countries")]
-async fn get_topcountries(root: &State<Root>) -> std::io::Result<Json<TopCountriesResp>> {
+fn get_topcountries(root: &State<Root>) -> Json<TopCountriesResp> {
     // Agrupa os superusuários por país.
     // Retorna os 5 países com maior número de superusuários.
     let start_time = Instant::now();
@@ -295,11 +295,11 @@ async fn get_topcountries(root: &State<Root>) -> std::io::Result<Json<TopCountri
         })
         .collect();
 
-    Ok(Json(TopCountriesResp {
+    Json(TopCountriesResp {
         timestamp: format!("{:?}", Local::now()),
         execution_time_ms: start_time.elapsed().as_millis(),
         countries,
-    }))
+    })
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -742,5 +742,38 @@ mod tests {
         assert_eq!(type_of(resp.execution_time_ms), "u128");
         assert_eq!(resp.user_count, 1);
         assert_eq!(resp.data[0], serde_json::from_str(expect_user).unwrap());
+    }
+
+    #[test]
+    fn test_get_topcountries() {
+        let rocket = _build_app_with_fixture("usuarios_10");
+        let state = _use_root_state(&rocket);
+        let resp = get_topcountries(state).0;
+
+        assert_eq!(
+            resp.countries,
+            vec![
+                CountrySummary {
+                    country: "Argentina".to_owned(),
+                    total: 3
+                },
+                CountrySummary {
+                    country: "Canadá".to_owned(),
+                    total: 2
+                },
+                CountrySummary {
+                    country: "Japão".to_owned(),
+                    total: 2
+                },
+                CountrySummary {
+                    country: "Brasil".to_owned(),
+                    total: 1
+                },
+                CountrySummary {
+                    country: "Índia".to_owned(),
+                    total: 1
+                },
+            ]
+        )
     }
 }
