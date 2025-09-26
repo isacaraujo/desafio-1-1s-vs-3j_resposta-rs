@@ -153,10 +153,7 @@ struct Upload {
 }
 
 #[post("/users", data = "<upload>")]
-async fn post_users(
-    upload: Form<Upload>,
-    root: &State<Root>,
-) -> std::io::Result<Json<CreateUsersResp>> {
+fn post_users(upload: Form<Upload>, root: &State<Root>) -> std::io::Result<Json<CreateUsersResp>> {
     /* FOI MUITO DIFÍCIL FAZER ESTE MÉTODO!
      * Tem algumas formas de processar um multipart request:
      * - Podemos processar o request Raw - aí precisaríamos
@@ -164,7 +161,8 @@ async fn post_users(
      *   em algum dado válido
      * - Utilizar o esquema de form. O problema é que aparentemente
      *   só funciona via `TempFile` (vou adicionar um TODO pra
-     *   testar usando String ou byte_array hehehe).
+     *   testar usando String ou byte_array hehehe)
+     *   ==> DONE (deu certo!!!).
      *
      * Pois bem, um outro desafio foi configurar o arquivo Rocket.toml
      * para o framework aceitar arquivos muito grandes (o sample com
@@ -172,6 +170,7 @@ async fn post_users(
      *
      * Bom, o resultado do código são as gambiarras abaixo (acredite,
      * sem ajuda de LLM hahaha - talvez por isso não ficou tão bom).
+     * ==> AGORA FICOU BOM <3! hehehehehe
      */
     let users: Vec<User> = serde_json::from_str(&upload.file)?;
 
@@ -668,15 +667,15 @@ mod tests {
         State::get(rocket).unwrap()
     }
 
-    #[tokio::test]
-    async fn test_post_users() {
+    #[test]
+    fn test_post_users() {
         let rocket = _build_app_with_empty_root();
         let root = _use_root_state(&rocket);
         let buf = _load_sample("usuarios_10");
 
         let upload = Form::from(Upload { file: buf });
 
-        let resp = post_users(upload, root).await.unwrap();
+        let resp = post_users(upload, root).unwrap();
 
         assert_eq!(
             resp.0,
