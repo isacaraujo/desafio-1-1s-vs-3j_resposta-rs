@@ -201,7 +201,7 @@ async fn post_users(
 }
 
 #[get("/superusers")]
-async fn get_superusers(root: &State<Root>) -> std::io::Result<Json<GetSuperusersResp>> {
+fn get_superusers(root: &State<Root>) -> Json<GetSuperusersResp> {
     // Filtro: score >= 900 e active = true
     // Retorna os dados e o tempo de processamento da requisição.
     let start_time = Instant::now();
@@ -243,12 +243,12 @@ async fn get_superusers(root: &State<Root>) -> std::io::Result<Json<GetSuperuser
      */
     let elapsed_time = start_time.elapsed();
 
-    Ok(Json(GetSuperusersResp {
+    Json(GetSuperusersResp {
         timestamp: format!("{:?}", Local::now()),
         execution_time_ms: elapsed_time.as_millis(),
         user_count: superusers.len(),
         data: superusers,
-    }))
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -689,12 +689,12 @@ mod tests {
         assert_eq!(root.get_users().len(), 10);
     }
 
-    #[tokio::test]
-    async fn test_get_superusers() {
+    #[test]
+    fn test_get_superusers() {
         let rocket = _build_app_with_fixture("usuarios_10");
         let state = _use_root_state(&rocket);
 
-        let resp = get_superusers(state).await.unwrap().0;
+        let resp = get_superusers(state).0;
 
         let expect_user = r#"
             {
