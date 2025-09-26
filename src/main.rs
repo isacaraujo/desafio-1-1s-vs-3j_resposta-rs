@@ -434,7 +434,7 @@ fn get_team_insights(root: &State<Root>) -> Json<TeamInsightsResp> {
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct ActiveUserLogin {
     date: String,
     total: usize,
@@ -448,10 +448,7 @@ struct ActiveUsersResp {
 }
 
 #[get("/active-users-per-day?<min>")]
-async fn get_active_users_per_day(
-    min: Option<u16>,
-    root: &State<Root>,
-) -> std::io::Result<Json<ActiveUsersResp>> {
+fn get_active_users_per_day(min: Option<u16>, root: &State<Root>) -> Json<ActiveUsersResp> {
     // Conta quantos logins aconteceram por data.
     // Query param opcional: ?min=3000 para filtrar dias com pelo menos 3.000 logins.
     let start_time = Instant::now();
@@ -477,17 +474,19 @@ async fn get_active_users_per_day(
      * Acho que é preciosismo (vou deixar no TODO com nota
      * de frescura check)
      */
-    let logins: Vec<ActiveUserLogin> = summary
+    let mut logins: Vec<ActiveUserLogin> = summary
         .into_iter()
         .filter(|(_, v)| v >= &min_)
         .map(|(date, total)| ActiveUserLogin { date, total })
         .collect();
 
-    Ok(Json(ActiveUsersResp {
+    logins.sort_by(|a, b| a.date.cmp(&b.date));
+
+    Json(ActiveUsersResp {
         timestamp: format!("{:?}", Local::now()),
         execution_time_ms: start_time.elapsed().as_millis(),
         logins,
-    }))
+    })
 }
 
 #[derive(Serialize, Debug)]
@@ -863,6 +862,47 @@ mod tests {
                         .into_iter()
                         .map(String::from)
                         .collect::<HashSet<String>>()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_active_users_per_day() {
+        let rocket = _build_app_with_fixture("usuarios_10");
+        let state = _use_root_state(&rocket);
+        let resp = get_active_users_per_day(Option::None, state).0;
+
+        assert_eq!(
+            resp.logins,
+            vec![
+                ActiveUserLogin {
+                    date: "2025-03-25".into(),
+                    total: 6
+                },
+                ActiveUserLogin {
+                    date: "2025-03-26".into(),
+                    total: 6
+                },
+                ActiveUserLogin {
+                    date: "2025-03-27".into(),
+                    total: 4
+                },
+                ActiveUserLogin {
+                    date: "2025-03-28".into(),
+                    total: 4
+                },
+                ActiveUserLogin {
+                    date: "2025-03-29".into(),
+                    total: 5
+                },
+                ActiveUserLogin {
+                    date: "2025-03-30".into(),
+                    total: 5
+                },
+                ActiveUserLogin {
+                    date: "2025-03-31".into(),
+                    total: 6
                 },
             ]
         );
