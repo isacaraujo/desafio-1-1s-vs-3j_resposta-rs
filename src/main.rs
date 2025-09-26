@@ -285,7 +285,29 @@ fn get_topcountries(root: &State<Root>) -> Json<TopCountriesResp> {
     });
 
     let mut sorted: Vec<(String, usize)> = summary.into_iter().collect();
-    sorted.sort_by(|(_, av), (_, bv)| bv.cmp(av));
+    sorted.sort_by(|(akey, aval), (bkey, bval)| {
+        /* Encontrei um glitch aqui:
+         * Descobri que os vetores gerados a partir de um
+         * HashMap sao promiscuos, aleatorios. Entao quando
+         * total empata, a ordem dos objetos ficam aleatorias.
+         * Ex: Imagina o cenario no qual temos Brasil com 1
+         * usuario e Argentina com 1. A ordenacao vai acontecer
+         * de acordo com a primeira ocorrencia, mas como a
+         * ordem eh aleatoria, entao a primeira ocorrencia
+         * pode ser Brasil ou Argentina.
+         * Em um panorama geral tudo bem, mas como iremos
+         * fazer um corte dos 5 primeiros paises, neste caso
+         * quem aparecera pode ser um pais bem aleatorio.
+         * Para tornar o resultado um pouco mais deterministico
+         * colocamos uma 'chave secundaria' de comparacao.
+         * Se der empate, vence o nome do pais em ASC.
+         */
+        let cmp_val = bval.cmp(aval);
+        if cmp_val == std::cmp::Ordering::Equal {
+            return akey.cmp(bkey);
+        }
+        cmp_val
+    });
 
     let countries: Vec<CountrySummary> = sorted[0..5]
         .iter()
@@ -764,23 +786,23 @@ mod tests {
             resp.countries,
             vec![
                 CountrySummary {
-                    country: "Argentina".to_owned(),
+                    country: "Argentina".into(),
                     total: 3
                 },
                 CountrySummary {
-                    country: "Canadá".to_owned(),
+                    country: "Canadá".into(),
                     total: 2
                 },
                 CountrySummary {
-                    country: "Japão".to_owned(),
+                    country: "Japão".into(),
                     total: 2
                 },
                 CountrySummary {
-                    country: "Brasil".to_owned(),
+                    country: "Brasil".into(),
                     total: 1
                 },
                 CountrySummary {
-                    country: "Índia".to_owned(),
+                    country: "França".into(),
                     total: 1
                 },
             ]
