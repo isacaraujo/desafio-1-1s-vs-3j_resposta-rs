@@ -7,7 +7,7 @@ use rocket::form::Form;
 use rocket::serde::json::Json;
 use rocket::tokio::time::Instant;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -302,7 +302,7 @@ fn get_topcountries(root: &State<Root>) -> Json<TopCountriesResp> {
     })
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct TeamInsight {
     team: String,
     total_members: usize,
@@ -314,6 +314,9 @@ struct TeamInsight {
      * este esquema. O skip salvou aqui */
     #[serde(skip_serializing, skip_deserializing)]
     active_count: usize,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    completed_projects_set: HashSet<String>,
 }
 
 impl TeamInsight {
@@ -325,6 +328,7 @@ impl TeamInsight {
             completed_projects: 0,
             active_percentage: 0.0,
             active_count: 0,
+            completed_projects_set: HashSet::new(),
         }
     }
 
@@ -335,6 +339,8 @@ impl TeamInsight {
      * tá!?
      */
     fn update_with_user(&mut self, u: &User) {
+        self.team = u.team.name.clone();
+
         self.total_members += 1;
 
         if u.active {
@@ -355,9 +361,11 @@ impl TeamInsight {
 
         for p in u.team.projects.iter() {
             if p.completed {
-                self.completed_projects += 1;
+                self.completed_projects_set.insert(p.name.clone());
             }
         }
+
+        self.completed_projects = self.completed_projects_set.len();
     }
 }
 
@@ -369,7 +377,7 @@ struct TeamInsightsResp {
 }
 
 #[get("/team-insights")]
-async fn get_team_insights(root: &State<Root>) -> std::io::Result<Json<TeamInsightsResp>> {
+fn get_team_insights(root: &State<Root>) -> Json<TeamInsightsResp> {
     // Agrupa por team.name.
     // Retorna: total de membros, líderes, projetos
     // concluídos e % de membros ativos.
@@ -377,7 +385,7 @@ async fn get_team_insights(root: &State<Root>) -> std::io::Result<Json<TeamInsig
 
     let users = root.get_users();
 
-    let summary: HashMap<String, TeamInsight> = users.iter().fold(HashMap::new(), |mut acc, u| {
+    let summary = users.iter().fold(HashMap::new(), |mut acc, u| {
         let def = TeamInsight::new();
         let mut insight = acc.get(&u.team.name).unwrap_or(&def).to_owned();
 
@@ -393,13 +401,15 @@ async fn get_team_insights(root: &State<Root>) -> std::io::Result<Json<TeamInsig
         acc
     });
 
-    let teams: Vec<TeamInsight> = summary.values().cloned().collect();
+    let mut teams: Vec<TeamInsight> = summary.values().cloned().collect();
 
-    Ok(Json(TeamInsightsResp {
+    teams.sort_by(|a, b| a.team.cmp(&b.team));
+
+    Json(TeamInsightsResp {
         timestamp: format!("{:?}", Local::now()),
         execution_time_ms: start_time.elapsed().as_millis(),
         teams,
-    }))
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -775,5 +785,64 @@ mod tests {
                 },
             ]
         )
+    }
+
+    #[test]
+    fn test_get_team_insights() {
+        let rocket = _build_app_with_fixture("usuarios_10");
+        let state = _use_root_state(&rocket);
+        let resp = get_team_insights(state).0;
+
+        assert_eq!(
+            resp.teams,
+            vec![
+                TeamInsight {
+                    team: "Frontend Avengers".into(),
+                    total_members: 4,
+                    leaders: 1,
+                    completed_projects: 4,
+                    active_percentage: 100.0,
+                    active_count: 4,
+                    completed_projects_set: vec![
+                        "API Pública",
+                        "Sistema Interno",
+                        "Dashboard",
+                        "Landing Page"
+                    ]
+                    .into_iter()
+                    .map(String::from)
+                    .collect::<HashSet<String>>()
+                },
+                TeamInsight {
+                    team: "Fullstack Force".into(),
+                    total_members: 4,
+                    leaders: 1,
+                    completed_projects: 4,
+                    active_percentage: 100.0,
+                    active_count: 4,
+                    completed_projects_set: vec![
+                        "Landing Page",
+                        "Sistema Interno",
+                        "Dashboard",
+                        "Mobile App"
+                    ]
+                    .into_iter()
+                    .map(String::from)
+                    .collect::<HashSet<String>>()
+                },
+                TeamInsight {
+                    team: "UX Wizards".into(),
+                    total_members: 2,
+                    leaders: 0,
+                    completed_projects: 1,
+                    active_percentage: 100.0,
+                    active_count: 2,
+                    completed_projects_set: vec!["Dashboard"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect::<HashSet<String>>()
+                },
+            ]
+        );
     }
 }
