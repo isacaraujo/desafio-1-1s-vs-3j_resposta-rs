@@ -10,26 +10,26 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct TeamProject {
     name: String,
     completed: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct UserTeam {
     name: String,
     leader: bool,
     projects: Vec<TeamProject>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct UserLog {
     date: String,
     action: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct User {
     id: String,
     name: String,
@@ -48,7 +48,7 @@ struct CreateUsersResp {
     user_count: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(crate = "rocket::serde")]
 struct GetSuperusersResp {
     timestamp: String,
@@ -80,6 +80,15 @@ impl Root {
 
         Root {
             users: AtomicPtr::new(Box::into_raw(users)),
+        }
+    }
+
+    #[cfg(test)]
+    fn from_users(users: Vec<User>) -> Root {
+        let users_box = Box::new(users);
+
+        Root {
+            users: AtomicPtr::new(Box::into_raw(users_box)),
         }
     }
 
@@ -616,15 +625,19 @@ fn rocket() -> _ {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::Read, path::Path};
+    use std::{any::type_name, fs::File, io::Read, path::Path};
+
+    use rocket::{Build, Rocket};
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_post_users() {
-        let rocket = rocket::build().manage(Root::new());
-        let root: &State<Root> = State::get(&rocket).unwrap();
-        let sample_path = Path::new("./samples/usuarios_10.json");
+    fn type_of<T>(_: T) -> &'static str {
+        type_name::<T>()
+    }
+
+    fn _load_sample(sample_name: &str) -> String {
+        let formatted_path = format!("./samples/{}.json", sample_name);
+        let sample_path = Path::new(&formatted_path);
 
         let mut buf = String::new();
 
@@ -633,6 +646,34 @@ mod tests {
             .read_to_string(&mut buf)
             .unwrap();
 
+        buf
+    }
+
+    fn _load_fixture_users(fixture_name: &str) -> serde_json::Result<Vec<User>> {
+        let buf = _load_sample(fixture_name);
+
+        serde_json::from_str(&buf)
+    }
+
+    fn _build_app_with_empty_root() -> Rocket<Build> {
+        rocket::build().manage(Root::new())
+    }
+
+    fn _build_app_with_fixture(fixture_name: &str) -> Rocket<Build> {
+        let users = _load_fixture_users(fixture_name).unwrap();
+        rocket::build().manage(Root::from_users(users))
+    }
+
+    fn _use_root_state(rocket: &Rocket<Build>) -> &State<Root> {
+        State::get(rocket).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_post_users() {
+        let rocket = _build_app_with_empty_root();
+        let root = _use_root_state(&rocket);
+        let buf = _load_sample("usuarios_10");
+
         let upload = Form::from(Upload { file: buf });
 
         let resp = post_users(upload, root).await.unwrap();
@@ -640,11 +681,67 @@ mod tests {
         assert_eq!(
             resp.0,
             CreateUsersResp {
-                message: String::from("Arquivo recebido com sucesso"),
+                message: "Arquivo recebido com sucesso".to_owned(),
                 user_count: 10,
             }
         );
 
         assert_eq!(root.get_users().len(), 10);
+    }
+
+    #[tokio::test]
+    async fn test_get_superusers() {
+        let rocket = _build_app_with_fixture("usuarios_10");
+        let state = _use_root_state(&rocket);
+
+        let resp = get_superusers(state).await.unwrap().0;
+
+        let expect_user = r#"
+            {
+                "id": "c460b871-77ec-46f1-9127-22ea6989b0bc",
+                "name": "Clarice Porto",
+                "age": 52,
+                "score": 1040,
+                "active": true,
+                "country": "Argentina",
+                "team": {
+                    "name": "Frontend Avengers",
+                    "leader": true,
+                    "projects": [
+                        {
+                            "name": "Sistema Interno",
+                            "completed": true
+                        }
+                    ]
+                },
+                "logs": [
+                    {
+                        "date": "2025-03-28",
+                        "action": "login"
+                    },
+                    {
+                        "date": "2025-03-29",
+                        "action": "login"
+                    },
+                    {
+                        "date": "2025-03-30",
+                        "action": "login"
+                    },
+                    {
+                        "date": "2025-03-27",
+                        "action": "login"
+                    },
+                    {
+                        "date": "2025-03-30",
+                        "action": "login"
+                    }
+                ]
+            }
+        "#;
+
+        assert_eq!(type_of(resp.timestamp), "alloc::string::String");
+        assert_eq!(type_of(resp.execution_time_ms), "u128");
+        assert_eq!(resp.user_count, 1);
+        assert_eq!(resp.data[0], serde_json::from_str(expect_user).unwrap());
     }
 }
